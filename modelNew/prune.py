@@ -33,7 +33,6 @@ from termcolor import colored
 from copy import deepcopy
 
 from modelNew.base_model import BaseModel
-from modelNew.ssl_module import Encoder
 from modelNew.gcn import GCN
 from modelNew.gin import GIN
 from modelNew.vgin import vGIN
@@ -355,4 +354,3 @@ class Model(BaseModel):
                 print(colored(f'{phase} Phase: Average {self.metric_name}: {metric_score}', 'blue','on_white'))
             self.train()
             return metric_score
-

@@ -150,7 +150,7 @@ parser.add_argument('--shift', type=str, default='covariate')
 parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate.')
 parser.add_argument('--adapt_lr', type=float, default=1e-4, help='Learning rate.')
 parser.add_argument('--lr_scheduler', action='store_false', default=True, help='Enable learning rate scheduler.')
-parser.add_argument('--batch_size', type=int, default=64)
+parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--epochs', type=int, default=50)
 parser.add_argument('--early_stop_epochs', type=int, default=10)
 parser.add_argument('--pretraining_epochs', type=int, default=10)
@@ -334,6 +334,5 @@ val_score,test_score = res[0]
 res = np.array([val_score,test_score])
 
 print (f'Best valid perf:{res[0]}, Test perf accordingly:{res[1]}')
-
 
 
