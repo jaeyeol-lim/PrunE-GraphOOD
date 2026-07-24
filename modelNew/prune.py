@@ -163,6 +163,14 @@ class Model(BaseModel):
         self.val_metrics = []
         self.test_metrics = []
 
+        # Optional edge-ground-truth diagnostics are enabled externally by
+        # some analysis scripts.  The official training path reads this flag
+        # unconditionally in learn_edge_weight(), so define its normal
+        # training default explicitly.
+        self.calc_edge_stats = False
+        self.edge_probs = []
+        self.edge_ranks = []
+
 
     def create_mlp(self,input_dim, hidden_dim, output_dim, num_layers,cls=True):
         layers = []
@@ -328,7 +336,9 @@ class Model(BaseModel):
             
             # Compute metric with all logits and labels
             if self.metric_name=='acc':
-                metric_score = self.metric_func(all_logits, all_labels).item()
+                metric_score = (
+                    all_logits.argmax(dim=-1) == all_labels.long()
+                ).float().mean().item()
             
             if self.metric_name=='auc':
                 metric_score = self.metric_func(all_logits[:,1], all_labels).item() # use pos logits

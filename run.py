@@ -60,6 +60,11 @@ from GOOD.data.good_datasets.good_motif import GOODMotif
 from GOOD.data.good_datasets.good_hiv import GOODHIV
 from GOOD.data.good_datasets.good_sst2 import GOODSST2
 
+BASELINES_ROOT = path.dirname(path.dirname(path.abspath(__file__)))
+if BASELINES_ROOT not in sys.path:
+    sys.path.insert(0, BASELINES_ROOT)
+from structural_ood.data import load_structural_ood
+
 
 def write_results_to_file(fpath, n, s):
     # Check if the directory exists, if not, create it
@@ -123,7 +128,7 @@ parser.add_argument('--dropout', type=float, default=0.0, help='Dropout rate.')
 parser.add_argument('--save_mem', action='store_true', default=True, help='Enable memory-saving mode.')
 parser.add_argument('--jk', type=str, default='last', choices=['last', 'concat'], help='Jumping knowledge mode.')
 parser.add_argument('--node_cls', action='store_true', default=False, help='node classification or graph cls')
-parser.add_argument('--pooling', type=str, default='sum', choices=['sum', 'attention'], help='Pooling strategy.')
+parser.add_argument('--pooling', type=str, default='sum', choices=['sum', 'mean', 'attention'], help='Pooling strategy.')
 parser.add_argument('--with_bn', action='store_true', default=False, help='Enable batch normalization.')
 parser.add_argument('--weight_decay', type=float, default=1e-6, help='Weight decay rate.')
 parser.add_argument('--with_bias', action='store_true', default=True, help='Include bias in layers.')
@@ -186,6 +191,8 @@ parser.add_argument('--random_edge_drop', type=float, default=0.0)
 parser.add_argument('--device', type=int, default=0)
 parser.add_argument('--seed', type=int, default=1) 
 parser.add_argument('--debug', action='store_true', default=False, help='Enable memory-saving mode.')
+parser.add_argument('--output_dir', type=str, default='', help='Optional normalized result directory.')
+parser.add_argument('--num_workers', type=int, default=0)
 # Parse arguments
 
 args = parser.parse_args()
@@ -246,8 +253,26 @@ args['dataset_name'] = dataset_name
 
 #! Init dataset
 
-workers = 2 if torch.cuda.is_available() else 0
-if 'cmnist' in args['dataset'].lower():
+workers = args['num_workers']
+structural_name = args['dataset'].lower().replace('_', '-')
+if structural_name in (
+        'cmnist-sp', 'cmnistsp',
+        'mnist75sp', 'mnist75-sp', 'mnist-75sp',
+        'graph-sst2', 'graphsst2',
+        'graph-sst5', 'graphsst5',
+        'graph-twitter', 'graphtwitter', 'graph-tt'):
+    shared_loaders, shared_meta = load_structural_ood(
+        BASELINES_ROOT, structural_name, args["batch_size"], workers)
+    train_loader = shared_loaders["train"]
+    valid_loader = shared_loaders["val"]
+    test_loader = shared_loaders["test"]
+    args['nclass'] = shared_meta['num_classes']
+    args['nfeat'] = shared_meta['input_dim']
+    args['nlayers'] = 3
+    args['valid_metric'] = 'acc'
+    args['dataset'] = shared_meta['dataset']
+
+elif 'cmnist' in args['dataset'].lower():
     args['nclass'] = 10
     args["nfeat"] = 3
     args['nlayers']=3
@@ -335,4 +360,17 @@ res = np.array([val_score,test_score])
 
 print (f'Best valid perf:{res[0]}, Test perf accordingly:{res[1]}')
 
-
+if args.get('output_dir'):
+    os.makedirs(args['output_dir'], exist_ok=True)
+    payload = {
+        'method': 'PrunE',
+        'dataset': args['dataset'],
+        'seed': args['seed'],
+        'selection_metric': 'accuracy',
+        'best_ood_val': float(val_score),
+        'metrics': {'ood_test': {'accuracy': float(test_score)}},
+        'args': {k: v for k, v in args.items()
+                 if isinstance(v, (str, int, float, bool, type(None)))},
+    }
+    with open(os.path.join(args['output_dir'], 'summary.json'), 'w') as f:
+        json.dump(payload, f, indent=2)
